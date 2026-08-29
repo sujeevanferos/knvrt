@@ -1,0 +1,583 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# ============================================================
+# Universal File Converter
+#
+# Backends:
+#   LibreOffice  -> documents / presentations / spreadsheets
+#   FFmpeg       -> audio / video / subtitles
+#   ImageMagick  -> images
+#
+# Usage:
+#   convert <input> <output-format>
+#
+# Examples:
+#   convert "file.docx" pdf
+#   convert "*.docx" pdf
+#   convert "*.pptx" pdf
+#   convert "song.mp3" flac
+#   convert "*.wav" mp3
+#   convert "video.mkv" mp4
+#   convert "image.png" webp
+#
+# ============================================================
+
+VERSION="1.0.1"
+
+# ------------------------------------------------------------
+# Colors
+# ------------------------------------------------------------
+
+if [[ -t 1 ]]; then
+    RED='\033[31m'
+    GREEN='\033[32m'
+    YELLOW='\033[33m'
+    BLUE='\033[34m'
+    RESET='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    RESET=''
+fi
+
+# ------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------
+
+info() {
+    echo -e "${BLUE}INFO${RESET}: $*"
+}
+
+success() {
+    echo -e "${GREEN}OK${RESET}: $*"
+}
+
+warn() {
+    echo -e "${YELLOW}WARN${RESET}: $*"
+}
+
+error() {
+    echo -e "${RED}ERROR${RESET}: $*" >&2
+}
+
+die() {
+    error "$*"
+    exit 1
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Returns "" (not the whole filename) when there is no extension.
+extension() {
+    local file="$1"
+    local name
+    name="$(basename "$file")"
+
+    if [[ "$name" == *.* && "$name" != .* ]]; then
+        echo "${name##*.}" | tr '[:upper:]' '[:lower:]'
+    else
+        echo ""
+    fi
+}
+
+basename_without_extension() {
+    local file="$1"
+    local name
+
+    name="$(basename "$file")"
+
+    if [[ "$name" == *.* ]]; then
+        echo "${name%.*}"
+    else
+        echo "$name"
+    fi
+}
+
+# ------------------------------------------------------------
+# Dependencies
+# ------------------------------------------------------------
+
+check_dependency() {
+    local tool="$1"
+
+    if ! command_exists "$tool"; then
+        error "$tool is not installed."
+
+        case "$tool" in
+            libreoffice)
+                echo "Install with:"
+                echo "  sudo apt install libreoffice"
+                ;;
+            ffmpeg)
+                echo "Install with:"
+                echo "  sudo apt install ffmpeg"
+                ;;
+            magick)
+                echo "Install with:"
+                echo "  sudo apt install imagemagick"
+                ;;
+        esac
+
+        return 1
+    fi
+
+    return 0
+}
+
+# ------------------------------------------------------------
+# Format detection
+# ------------------------------------------------------------
+
+is_document() {
+    case "$1" in
+        doc|docx|docm|odt|rtf|txt|html|htm)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_presentation() {
+    case "$1" in
+        ppt|pptx|pptm|odp)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_spreadsheet() {
+    case "$1" in
+        xls|xlsx|xlsm|ods|csv)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_image() {
+    case "$1" in
+        jpg|jpeg|png|webp|gif|bmp|tiff|tif|svg|ico|avif|heic|heif)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_audio() {
+    case "$1" in
+        mp3|wav|flac|ogg|oga|opus|aac|m4a|wma|alac)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_video() {
+    case "$1" in
+        mp4|mkv|webm|avi|mov|flv|wmv|mpeg|mpg|m4v|ts|3gp)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# ------------------------------------------------------------
+# LibreOffice conversion
+# ------------------------------------------------------------
+
+convert_office() {
+    local input="$1"
+    local output_format="$2"
+
+    check_dependency libreoffice || return 1
+
+    local dir
+    dir="$(dirname "$input")"
+
+    info "LibreOffice: $(basename "$input") → $output_format"
+
+    libreoffice \
+        --headless \
+        --convert-to "$output_format" \
+        --outdir "$dir" \
+        "$input"
+
+    success "$(basename "$input") converted."
+}
+
+# ------------------------------------------------------------
+# ImageMagick conversion
+# ------------------------------------------------------------
+
+convert_image() {
+    local input="$1"
+    local output_format="$2"
+
+    check_dependency magick || return 1
+
+    local dir
+    local base
+    local output
+
+    dir="$(dirname "$input")"
+    base="$(basename_without_extension "$input")"
+
+    output="$dir/$base.$output_format"
+
+    info "ImageMagick: $(basename "$input") → $output_format"
+
+    magick "$input" "$output"
+
+    success "$output"
+}
+
+# ------------------------------------------------------------
+# FFmpeg conversion
+# ------------------------------------------------------------
+
+convert_media() {
+    local input="$1"
+    local output_format="$2"
+
+    check_dependency ffmpeg || return 1
+
+    local dir
+    local base
+    local output
+
+    dir="$(dirname "$input")"
+    base="$(basename_without_extension "$input")"
+
+    output="$dir/$base.$output_format"
+
+    info "FFmpeg: $(basename "$input") → $output_format"
+
+    ffmpeg \
+        -hide_banner \
+        -i "$input" \
+        -y \
+        "$output"
+
+    success "$output"
+}
+
+# ------------------------------------------------------------
+# Subtitle embedding
+# ------------------------------------------------------------
+
+add_subtitles() {
+    local video="$1"
+    local subtitle="$2"
+    local output="$3"
+
+    check_dependency ffmpeg || return 1
+
+    info "Adding subtitles:"
+    echo "  Video:    $video"
+    echo "  Subtitle: $subtitle"
+    echo "  Output:   $output"
+
+    ffmpeg \
+        -hide_banner \
+        -i "$video" \
+        -i "$subtitle" \
+        -map 0 \
+        -map 1 \
+        -c copy \
+        -c:s mov_text \
+        -y \
+        "$output"
+
+    success "Subtitles added."
+}
+
+# ------------------------------------------------------------
+# Burn subtitles
+# ------------------------------------------------------------
+
+burn_subtitles() {
+    local video="$1"
+    local subtitle="$2"
+    local output="$3"
+
+    check_dependency ffmpeg || return 1
+
+    info "Burning subtitles into video..."
+
+    ffmpeg \
+        -hide_banner \
+        -i "$video" \
+        -vf "subtitles=$subtitle" \
+        -c:a copy \
+        -y \
+        "$output"
+
+    success "Subtitles burned into video."
+}
+
+# ------------------------------------------------------------
+# Main conversion
+# ------------------------------------------------------------
+
+convert_file() {
+    local input="$1"
+    local output_format="$2"
+
+    [[ -f "$input" ]] || {
+        error "File not found: $input"
+        return 1
+    }
+
+    local input_ext
+    input_ext="$(extension "$input")"
+
+    if [[ -z "$input_ext" ]]; then
+        error "Could not determine file type (no extension): $input"
+        return 1
+    fi
+
+    output_format="${output_format#.}"
+    output_format="$(echo "$output_format" | tr '[:upper:]' '[:lower:]')"
+
+    # Office → PDF
+    if [[ "$output_format" == "pdf" ]]; then
+
+        if is_document "$input_ext" ||
+           is_presentation "$input_ext" ||
+           is_spreadsheet "$input_ext"; then
+
+            convert_office "$input" pdf
+            return
+        fi
+    fi
+
+    # Images
+    if is_image "$input_ext" && is_image "$output_format"; then
+        convert_image "$input" "$output_format"
+        return
+    fi
+
+    # Audio / Video
+    if is_audio "$input_ext" || is_video "$input_ext"; then
+        convert_media "$input" "$output_format"
+        return
+    fi
+
+    error "Unsupported conversion:"
+    echo "  $input_ext → $output_format"
+
+    return 1
+}
+
+# ------------------------------------------------------------
+# Batch expansion
+# ------------------------------------------------------------
+
+expand_inputs() {
+
+    local pattern="$1"
+
+    shopt -s nullglob
+
+    local files=( $pattern )
+
+    shopt -u nullglob
+
+    if (( ${#files[@]} == 0 )); then
+        return 1
+    fi
+
+    printf '%s\n' "${files[@]}"
+}
+
+# ------------------------------------------------------------
+# Usage
+# ------------------------------------------------------------
+
+usage() {
+
+    cat <<EOF
+
+Universal File Converter $VERSION
+
+Usage:
+
+    convert <input> <output-format>
+
+Examples:
+
+    convert file.docx pdf
+    convert "*.docx" pdf
+    convert "*.pptx" pdf
+
+    convert song.mp3 flac
+    convert "*.wav" mp3
+
+    convert video.mkv mp4
+    convert "*.avi" mp4
+
+    convert image.png webp
+    convert "*.jpg" webp
+
+Subtitle operations:
+
+    convert --subtitle video.mp4 subtitles.srt output.mp4
+
+    convert --burn-subtitle video.mp4 subtitles.srt output.mp4
+
+Options:
+
+    -h, --help       Show this help
+    -v, --version    Show version
+
+Supported:
+
+    Documents:
+        doc docx docm odt rtf txt html htm
+
+    Presentations:
+        ppt pptx pptm odp
+
+    Spreadsheets:
+        xls xlsx xlsm ods csv
+
+    Images:
+        jpg jpeg png webp gif bmp tiff tif svg ico avif heic heif
+
+    Audio:
+        mp3 wav flac ogg oga opus aac m4a wma alac
+
+    Video:
+        mp4 mkv webm avi mov flv wmv mpeg mpg m4v ts 3gp
+
+EOF
+}
+
+# ------------------------------------------------------------
+# Argument parsing
+# ------------------------------------------------------------
+
+if [[ $# -eq 0 ]]; then
+    usage
+    exit 0
+fi
+
+case "$1" in
+
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    -v|--version)
+        echo "$VERSION"
+        exit 0
+        ;;
+
+    --subtitle)
+
+        [[ $# -eq 4 ]] || die \
+            "Usage: convert --subtitle video subtitle output"
+
+        add_subtitles "$2" "$3" "$4"
+        exit
+        ;;
+
+    --burn-subtitle)
+
+        [[ $# -eq 4 ]] || die \
+            "Usage: convert --burn-subtitle video subtitle output"
+
+        burn_subtitles "$2" "$3" "$4"
+        exit
+        ;;
+
+esac
+
+# ------------------------------------------------------------
+# Normal conversion
+# ------------------------------------------------------------
+
+[[ $# -eq 2 ]] || {
+    usage
+    exit 1
+}
+
+INPUT="$1"
+OUTPUT_FORMAT="$2"
+
+# Expand glob ourselves.
+# This allows:
+#
+#   "*.docx"
+#
+# to work correctly even when quoted.
+
+FILES=()
+
+if [[ "$INPUT" == *'*'* ||
+      "$INPUT" == *'?'* ||
+      "$INPUT" == *'['* ]]; then
+
+    if ! mapfile -t FILES < <(expand_inputs "$INPUT"); then
+        die "No files matched: $INPUT"
+    fi
+
+    if (( ${#FILES[@]} == 0 )); then
+        die "No files matched: $INPUT"
+    fi
+
+else
+
+    FILES=("$INPUT")
+
+fi
+
+# ------------------------------------------------------------
+# Convert
+# ------------------------------------------------------------
+
+TOTAL=${#FILES[@]}
+COUNT=0
+FAILURES=0
+
+for file in "${FILES[@]}"; do
+
+    COUNT=$((COUNT + 1))
+
+    echo
+    echo "[$COUNT/$TOTAL]"
+
+    if ! convert_file "$file" "$OUTPUT_FORMAT"; then
+        FAILURES=$((FAILURES + 1))
+    fi
+
+done
+
+echo
+
+if (( FAILURES > 0 )); then
+    error "Conversion finished with $FAILURES / $TOTAL failure(s)."
+    exit 1
+else
+    success "Conversion finished."
+fi
