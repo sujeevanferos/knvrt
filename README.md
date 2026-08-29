@@ -4,12 +4,40 @@ A unified command-line file converter for documents, presentations, spreadsheets
 
 `knvrt` provides a simple interface over established conversion tools, selecting the appropriate backend for the requested conversion. It is designed for terminal-based workflows, batch processing, scripting, and automation.
 
+## Table of Contents
+
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Dependency Installation](#dependency-installation)
+- [Checking Dependencies](#checking-dependencies)
+- [Usage](#usage)
+- [Batch Conversion](#batch-conversion)
+- [Document Conversion](#document-conversion)
+- [Presentation Conversion](#presentation-conversion)
+- [Spreadsheet Conversion](#spreadsheet-conversion)
+- [Image Conversion](#image-conversion)
+- [Audio Conversion](#audio-conversion)
+- [Video Conversion](#video-conversion)
+- [Subtitle Operations](#subtitle-operations)
+- [Command-Line Help](#command-line-help)
+- [Output Behaviour](#output-behaviour)
+- [Limitations](#limitations)
+- [Project Status](#project-status)
+- [Roadmap](#roadmap)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Security Considerations](#security-considerations)
+- [License](#license)
+- [Maintainer](#maintainer)
+
 ## Features
 
-- Document, presentation, and spreadsheet conversion through LibreOffice.
+- Document, presentation, and spreadsheet conversion through [LibreOffice](https://www.libreoffice.org/).
 - PDF conversion for supported office and document formats.
-- Image conversion through ImageMagick.
-- Audio and video conversion through FFmpeg.
+- Image conversion through [ImageMagick](https://imagemagick.org/).
+- Audio and video conversion through [FFmpeg](https://ffmpeg.org/).
 - Subtitle embedding as selectable subtitle tracks.
 - Subtitle burning directly into video.
 - Batch conversion using shell glob patterns.
@@ -44,12 +72,12 @@ This approach keeps `knvrt` small while taking advantage of mature, widely used 
 
 `knvrt` requires Bash and one or more conversion backends, depending on the formats you want to process.
 
-| Tool | Used for |
-|---|---|
-| Bash | `knvrt` itself |
-| LibreOffice | Documents, presentations, spreadsheets, PDF export |
-| FFmpeg | Audio, video, subtitles |
-| ImageMagick | Images |
+| Tool | Used for | Official site |
+|---|---|---|
+| Bash | `knvrt` itself | [GNU Bash](https://www.gnu.org/software/bash/) |
+| LibreOffice | Documents, presentations, spreadsheets, PDF export | [libreoffice.org](https://www.libreoffice.org/) |
+| FFmpeg | Audio, video, subtitles | [ffmpeg.org](https://ffmpeg.org/) |
+| ImageMagick | Images | [imagemagick.org](https://imagemagick.org/) |
 
 You do not need to install every backend if you only need a subset of the supported functionality.
 
@@ -123,26 +151,19 @@ sudo apt update
 sudo apt install libreoffice ffmpeg imagemagick
 ```
 
-### Debian
-
-```bash
-sudo apt update
-sudo apt install libreoffice ffmpeg imagemagick
-```
-
 ### Fedora
 
 ```bash
 sudo dnf install libreoffice ffmpeg ImageMagick
 ```
 
-On some Fedora installations, FFmpeg packages may be provided through RPM Fusion rather than the default repositories. Follow Fedora/RPM Fusion documentation if `ffmpeg` is unavailable from the configured repositories.
+On some Fedora installations, FFmpeg packages may be provided through RPM Fusion rather than the default repositories. Follow the [RPM Fusion documentation](https://rpmfusion.org/) if `ffmpeg` is unavailable from the configured repositories.
 
 ### RHEL / Rocky Linux / AlmaLinux
 
 LibreOffice and ImageMagick are available through the standard package ecosystem, while FFmpeg availability depends on the enabled repositories.
 
-Typical package installation is:
+Typical installation is:
 
 ```bash
 sudo dnf install libreoffice ImageMagick
@@ -156,7 +177,7 @@ Install FFmpeg from an enabled repository appropriate for your distribution.
 sudo pacman -S libreoffice-fresh ffmpeg imagemagick
 ```
 
-For Arch-based systems, package names can vary with repository and distribution choices. Use the package manager to search when necessary:
+For Arch-based systems, package names can vary with repository and distribution choices. Search the available packages when necessary:
 
 ```bash
 pacman -Ss libreoffice ffmpeg imagemagick
@@ -178,9 +199,9 @@ Availability of the full LibreOffice package and individual FFmpeg codecs can va
 
 ### macOS
 
-The recommended approach is Homebrew.
+The recommended approach is [Homebrew](https://brew.sh/).
 
-Install Homebrew from the official Homebrew documentation, then:
+Install Homebrew, then:
 
 ```bash
 brew install --cask libreoffice
@@ -191,9 +212,9 @@ Clone and install `knvrt` from GitHub as described above.
 
 ### Windows
 
-`knvrt` is currently intended primarily for Unix-like environments. On Windows, the recommended option is WSL.
+`knvrt` is currently intended primarily for Unix-like environments. On Windows, the recommended option is [WSL](https://learn.microsoft.com/windows/wsl/).
 
-Install WSL and an Ubuntu distribution, then follow the Debian/Ubuntu instructions inside WSL:
+Install WSL with an Ubuntu distribution, then follow the Debian/Ubuntu instructions inside WSL:
 
 ```bash
 sudo apt update
@@ -566,6 +587,4 @@ Copyright (c) 2026 Sujeevan Feros.
 
 Maintained by [sujeevanferos](https://github.com/sujeevanferos).
 
-Repository:
-
-https://github.com/sujeevanferos/knvrt
+Repository: [github.com/sujeevanferos/knvrt](https://github.com/sujeevanferos/knvrt)
